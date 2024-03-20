@@ -1,10 +1,10 @@
 # This makefile is for use with the Raspberry Pi when using an HD44780 compatible display. The wiringpi library is needed.
 
-CC      = cc
-CXX     = c++
-CFLAGS  = -g -O3 -Wall -std=c++0x -pthread -DHAVE_LOG_H -DHD44780 -I/usr/local/include
-LIBS    = -lwiringPi -lwiringPiDev -lpthread -lutil -lsamplerate
-LDFLAGS = -g -L/usr/local/lib
+CC      = riscv64-unknown-linux-musl-gcc
+CXX     = riscv64-unknown-linux-musl-g++
+CFLAGS  = -g -O3 -Wall -std=c++0x -pthread -DHAVE_LOG_H -DHD44780 -I/usr/local/include/
+LIBS    = -lwiringx -lpthread -lutil -lsamplerate -L/usr/local/lib/
+LDFLAGS = -g -static
 
 OBJECTS = \
 		AMBEFEC.o AX25Control.o AX25Network.o BCH.o BPTC19696.o CASTInfo.o Conf.o CRC.o Display.o DMRControl.o DMRCSBK.o DMRData.o DMRDataHeader.o \
@@ -16,15 +16,15 @@ OBJECTS = \
 		NXDNSACCH.o NXDNUDCH.o P25Audio.o P25Control.o P25Data.o P25LowSpeedData.o P25Network.o P25NID.o P25Trellis.o P25Utils.o PseudoTTYController.o \
 		POCSAGControl.o POCSAGNetwork.o QR1676.o RemoteControl.o RS129.o RS241213.o RSSIInterpolator.o SerialPort.o SMeter.o StopWatch.o Sync.o SHA256.o \
 		TFTSurenoo.o Thread.o Timer.o UARTController.o UDPController.o UDPSocket.o UserDB.o UserDBentry.o Utils.o YSFControl.o YSFConvolution.o YSFFICH.o \
-		YSFNetwork.o YSFPayload.o
+		YSFNetwork.o YSFPayload.o wiringpi_lib/lcd.o wiringpi_lib/softPwm.o wiringpi_lib/piHiPri.o
 
 all:		MMDVMHost RemoteCommand
 
 MMDVMHost:	GitVersion.h $(OBJECTS) 
-		$(CXX) $(OBJECTS) $(CFLAGS) $(LIBS) -o MMDVMHost
+		$(CXX) $(OBJECTS) $(CFLAGS) $(LDFLAGS) $(LIBS) -o MMDVMHost
 
 RemoteCommand:	Log.o RemoteCommand.o UDPSocket.o
-		$(CXX) Log.o RemoteCommand.o UDPSocket.o $(CFLAGS) $(LIBS) -o RemoteCommand
+		$(CXX) Log.o RemoteCommand.o UDPSocket.o $(CFLAGS) $(LDFLAGS) $(LIBS) -o RemoteCommand
 
 %.o: %.cpp
 		$(CXX) $(CFLAGS) -c -o $@ $<
@@ -57,7 +57,7 @@ uninstall-service:
 		@rm -f /lib/systemd/system/mmdvmhost.service || true
 
 clean:
-		$(RM) MMDVMHost RemoteCommand *.o *.d *.bak *~ GitVersion.h
+		$(RM) MMDVMHost RemoteCommand *.o wiringpi_lib/*.o *.d *.bak *~ GitVersion.h
 
 # Export the current git version if the index file exists, else 000...
 GitVersion.h:

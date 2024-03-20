@@ -19,9 +19,9 @@
 #include "HD44780.h"
 #include "Log.h"
 
-#include <wiringPi.h>
-#include <softPwm.h>
-#include <lcd.h>
+#include <wiringx.h>
+#include "wiringpi_lib/softPwm.h"
+#include "wiringpi_lib/lcd.h"
 #include <pthread.h>
 
 #include <cstdio>
@@ -152,31 +152,31 @@ unsigned char privChar[8] =
 	0b00000
 };
 
+void pwmWrite(int a, int b)
+{
+	LogWarning("pwmWrite not Implemented");
+}
+
 CHD44780::~CHD44780()
 {
 }
 
 bool CHD44780::open()
 {
-	::wiringPiSetup();
+	if (::wiringXSetup("milkv_duo", NULL) == -1) {
+		::wiringXGC();
+		LogError("WiringX setup failed");
+		return false;
+	}
 
 	if (m_pwm) {
 		if (m_pwmPin != 1U) {
 			::softPwmCreate(m_pwmPin, 0, 100);
 			::softPwmWrite(m_pwmPin, m_pwmDim);
 		} else {
-			::pinMode(m_pwmPin, PWM_OUTPUT);
 			::pwmWrite(m_pwmPin, (m_pwmDim / 100) * 1024);
 		}
 	}
-
-#ifdef ADAFRUIT_DISPLAY
-  adafruitLCDSetup();
-#endif
-
-#ifdef PCF8574_DISPLAY
-	pcf8574LCDSetup();
-#endif
 
 	m_fd = ::lcdInit(m_rows, m_cols, 4, m_rb, m_strb, m_d0, m_d1, m_d2, m_d3, 0, 0, 0, 0);
 	if (m_fd == -1) {
@@ -197,109 +197,10 @@ bool CHD44780::open()
 	return true;
 }
 
-#ifdef ADAFRUIT_DISPLAY
-void CHD44780::adafruitLCDSetup()
-{
-    // The other control pins are initialised with lcdInit()
-    ::mcp23017Setup(AF_BASE, m_i2cAddress);
-
-    // Backlight LEDs    
-    ::pinMode(AF_RED,   OUTPUT);
-    ::pinMode(AF_GREEN, OUTPUT);
-    ::pinMode(AF_BLUE,  OUTPUT);
-
-    // Control signals
-    ::pinMode(AF_RW, OUTPUT);
-    ::digitalWrite(AF_RW, LOW);
-
-	m_rb   = AF_RS;
-	m_strb = AF_E;
-	m_d0   = AF_D0;
-	m_d1   = AF_D1;
-	m_d2   = AF_D2;
-	m_d3   = AF_D3;
-}
-
-void CHD44780::adafruitLCDColour(ADAFRUIT_COLOUR colour)
-{
-	switch (colour) {
-		 case AC_OFF:
-		 		::digitalWrite(AF_RED, AF_OFF);
-		 		::digitalWrite(AF_GREEN, AF_OFF);
-		 		::digitalWrite(AF_BLUE, AF_OFF);
-		 		break;
-		 case AC_WHITE:
-		 		::digitalWrite(AF_RED, AF_ON);
-		 		::digitalWrite(AF_GREEN, AF_ON);
-		 		::digitalWrite(AF_BLUE, AF_ON);
-		 		break;
-		 case AC_RED:
-		 		::digitalWrite(AF_RED, AF_ON);
-		 		::digitalWrite(AF_GREEN, AF_OFF);
-		 		::digitalWrite(AF_BLUE, AF_OFF);
-		 		break;
-		 case AC_GREEN:
-		 		::digitalWrite(AF_RED, AF_OFF);
-		 		::digitalWrite(AF_GREEN, AF_ON);
-		 		::digitalWrite(AF_BLUE, AF_OFF);
-		 		break;
-		 case AC_BLUE:
-		 		::digitalWrite(AF_RED, AF_OFF);
-		 		::digitalWrite(AF_GREEN, AF_OFF);
-		 		::digitalWrite(AF_BLUE, AF_ON);
-		 		break;
-		 case AC_PURPLE:
-		 		::digitalWrite(AF_RED, AF_ON);
-		 		::digitalWrite(AF_GREEN, AF_OFF);
-		 		::digitalWrite(AF_BLUE, AF_ON);
-		 		break;
-		 case AC_YELLOW:
-		 		::digitalWrite(AF_RED, AF_ON);
-		 		::digitalWrite(AF_GREEN, AF_ON);
-		 		::digitalWrite(AF_BLUE, AF_OFF);
-		 		break;
-		 case AC_ICE:
-		 		::digitalWrite(AF_RED, AF_OFF);
-		 		::digitalWrite(AF_GREEN, AF_ON);
-		 		::digitalWrite(AF_BLUE, AF_ON);
-		 		break;
-		 default:
-		 	break;
-	}
-}
-#endif
-
-#ifdef PCF8574_DISPLAY
-void CHD44780::pcf8574LCDSetup()
-{
-	// Initalize PFC8574
-	::pcf8574Setup(AF_BASE, m_i2cAddress);
-
-	// Turn on backlight
-	::pinMode(AF_BL, OUTPUT);
-	::digitalWrite(AF_BL, 1);
-
-	// Set LCD to write mode.
-	::pinMode(AF_RW, OUTPUT);
-	::digitalWrite(AF_RW, 0);
-
-	m_rb   = AF_RS;
-	m_strb = AF_E;
-	m_d0   = AF_D0;
-	m_d1   = AF_D1;
-	m_d2   = AF_D2;
-	m_d3   = AF_D3;
-}
-#endif
-
 void CHD44780::setIdleInt()
 {
 	m_clockDisplayTimer.start();          // Start the clock display in IDLE only
 	::lcdClear(m_fd);
-	
-#ifdef ADAFRUIT_DISPLAY
-	adafruitLCDColour(AC_WHITE);
-#endif
 
 	if (m_pwm) {
 		if (m_pwmPin != 1U)
@@ -327,10 +228,6 @@ void CHD44780::setErrorInt(const char* text)
 {
 	assert(text != NULL);
 
-#ifdef ADAFRUIT_DISPLAY
-	adafruitLCDColour(AC_RED);
-#endif
-
 	m_clockDisplayTimer.stop();           // Stop the clock display
 	::lcdClear(m_fd);
 
@@ -352,9 +249,6 @@ void CHD44780::setErrorInt(const char* text)
 
 void CHD44780::setLockoutInt()
 {
-#ifdef ADAFRUIT_DISPLAY
-	adafruitLCDColour(AC_RED);
-#endif
 
 	m_clockDisplayTimer.stop();           // Stop the clock display
 	::lcdClear(m_fd);
@@ -377,9 +271,6 @@ void CHD44780::setLockoutInt()
 
 void CHD44780::setQuitInt()
 {
-#ifdef ADAFRUIT_DISPLAY
-	adafruitLCDColour(AC_RED);
-#endif
 
 	m_clockDisplayTimer.stop();           // Stop the clock display
 	::lcdClear(m_fd);
@@ -404,10 +295,6 @@ void CHD44780::setFMInt()
 {
 	m_clockDisplayTimer.stop();
 	::lcdClear(m_fd);
-	
-#ifdef ADAFRUIT_DISPLAY
-	adafruitLCDColour(AC_WHITE);
-#endif
 
 	if (m_pwm) {
 		if (m_pwmPin != 1U)
@@ -438,10 +325,6 @@ void CHD44780::writeDStarInt(const char* my1, const char* my2, const char* your,
 	assert(your != NULL);
 	assert(type != NULL);
 	assert(reflector != NULL);
-
-#ifdef ADAFRUIT_DISPLAY
-	adafruitLCDColour(AC_RED);
-#endif
 
 	m_clockDisplayTimer.stop();           // Stop the clock display
 	::lcdClear(m_fd);
@@ -510,9 +393,6 @@ void CHD44780::writeDStarRSSIInt(unsigned char rssi)
 
 void CHD44780::clearDStarInt()
 {
-#ifdef ADAFRUIT_DISPLAY
-	adafruitLCDColour(AC_PURPLE);
-#endif
 
 	m_clockDisplayTimer.stop();           // Stop the clock display
 	::lcdClear(m_fd);
@@ -531,10 +411,6 @@ void CHD44780::writeDMRInt(unsigned int slotNo, const std::string& src, bool gro
 	if (!m_dmr) {
 		m_clockDisplayTimer.stop();          // Stop the clock display
 		::lcdClear(m_fd);
-
-#ifdef ADAFRUIT_DISPLAY
-		adafruitLCDColour(AC_GREEN);
-#endif
 
 		if (m_pwm) {
 			if (m_pwmPin != 1U)
@@ -575,10 +451,6 @@ void CHD44780::writeDMRInt(unsigned int slotNo, const std::string& src, bool gro
 			::lcdPrintf(m_fd, "%.*s", m_cols, LISTENING);
 		}
 	}
-
-#ifdef ADAFRUIT_DISPLAY
-	adafruitLCDColour(AC_RED);
-#endif
 
 	if (m_duplex) {
 		if (m_rows > 2U) {
@@ -693,9 +565,6 @@ void CHD44780::writeDMRRSSIInt(unsigned int slotNo, unsigned char rssi)
 
 void CHD44780::clearDMRInt(unsigned int slotNo)
 {
-#ifdef ADAFRUIT_DISPLAY
-	adafruitLCDColour(AC_PURPLE);
-#endif
 
 	m_clockDisplayTimer.stop();           // Stop the clock display
 
@@ -738,10 +607,6 @@ void CHD44780::writeFusionInt(const char* source, const char* dest, unsigned cha
 	assert(dest != NULL);
 	assert(type != NULL);
 	assert(origin != NULL);
-
-#ifdef ADAFRUIT_DISPLAY
-	adafruitLCDColour(AC_RED);
-#endif
 
 	m_clockDisplayTimer.stop();           // Stop the clock display
 	::lcdClear(m_fd);
@@ -801,9 +666,6 @@ void CHD44780::writeFusionRSSIInt(unsigned char rssi)
 
 void CHD44780::clearFusionInt()
 {
-#ifdef ADAFRUIT_DISPLAY
-	adafruitLCDColour(AC_PURPLE);
-#endif
 	m_clockDisplayTimer.stop();           // Stop the clock display
 
 	if (m_rows == 2U && m_cols == 16U) {
@@ -837,10 +699,6 @@ void CHD44780::writeP25Int(const char* source, bool group, unsigned int dest, co
 {
 	assert(source != NULL);
 	assert(type != NULL);
-
-#ifdef ADAFRUIT_DISPLAY
-	adafruitLCDColour(AC_RED);
-#endif
 
 	m_clockDisplayTimer.stop();           // Stop the clock display
 	::lcdClear(m_fd);
@@ -900,9 +758,6 @@ void CHD44780::writeP25RSSIInt(unsigned char rssi)
 
 void CHD44780::clearP25Int()
 {
-#ifdef ADAFRUIT_DISPLAY
-	adafruitLCDColour(AC_PURPLE);
-#endif
 
 	m_clockDisplayTimer.stop();           // Stop the clock display
 
@@ -937,10 +792,6 @@ void CHD44780::writeNXDNInt(const char* source, bool group, unsigned int dest, c
 {
 	assert(source != NULL);
 	assert(type != NULL);
-
-#ifdef ADAFRUIT_DISPLAY
-	adafruitLCDColour(AC_RED);
-#endif
 
 	m_clockDisplayTimer.stop();           // Stop the clock display
 	::lcdClear(m_fd);
@@ -999,9 +850,6 @@ void CHD44780::writeNXDNRSSIInt(unsigned char rssi)
 
 void CHD44780::clearNXDNInt()
 {
-#ifdef ADAFRUIT_DISPLAY
-	adafruitLCDColour(AC_PURPLE);
-#endif
 
 	m_clockDisplayTimer.stop();           // Stop the clock display
 
@@ -1038,9 +886,6 @@ void CHD44780::writeM17Int(const char* source, const char* dest, const char* typ
 	assert(dest != NULL);
 	assert(type != NULL);
 
-#ifdef ADAFRUIT_DISPLAY
-		adafruitLCDColour(AC_RED);
-#endif
 
 	m_clockDisplayTimer.stop();           // Stop the clock display
 	::lcdClear(m_fd);
@@ -1097,9 +942,6 @@ void CHD44780::writeM17RSSIInt(unsigned char rssi)
 
 void CHD44780::clearM17Int()
 {
-#ifdef ADAFRUIT_DISPLAY
-	adafruitLCDColour(AC_PURPLE);
-#endif
 	m_clockDisplayTimer.stop();           // Stop the clock display
 
 	if (m_rows == 2U && m_cols == 16U) {
