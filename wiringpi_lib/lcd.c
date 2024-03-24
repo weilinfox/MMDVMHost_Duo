@@ -151,7 +151,7 @@ static void putCommand (const struct lcdDataStruct *lcd, unsigned char command)
 {
   digitalWrite (lcd->rsPin,   0) ;
   sendDataCmd  (lcd, command) ;
-  delayMicroseconds (2) ;
+  delayMicroseconds (2000) ;
 }
 
 static void put4Command (const struct lcdDataStruct *lcd, unsigned char command)
@@ -188,7 +188,7 @@ void lcdHome (const int fd)
 
   putCommand (lcd, LCD_HOME) ;
   lcd->cx = lcd->cy = 0 ;
-  delayMicroseconds (5) ;
+  delayMicroseconds (5000) ;
 }
 
 void lcdClear (const int fd)
@@ -198,7 +198,7 @@ void lcdClear (const int fd)
   putCommand (lcd, LCD_CLEAR) ;
   putCommand (lcd, LCD_HOME) ;
   lcd->cx = lcd->cy = 0 ;
-  delayMicroseconds (5) ;
+  delayMicroseconds (5000) ;
 }
 
 
@@ -439,7 +439,7 @@ int lcdInit (const int rows, const int cols, const int bits,
     digitalWrite (lcd->dataPins [i], 0) ;
     pinMode      (lcd->dataPins [i], PINMODE_OUTPUT) ;
   }
-  delayMicroseconds (35) ; // mS
+  delayMicroseconds (35000) ; // mS
 
 
 // 4-bit mode?
@@ -460,25 +460,25 @@ int lcdInit (const int rows, const int cols, const int bits,
   if (bits == 4)
   {
     func = LCD_FUNC | LCD_FUNC_DL ;			// Set 8-bit mode 3 times
-    put4Command (lcd, func >> 4) ; delayMicroseconds (35) ;
-    put4Command (lcd, func >> 4) ; delayMicroseconds (35) ;
-    put4Command (lcd, func >> 4) ; delayMicroseconds (35) ;
+    put4Command (lcd, func >> 4) ; delayMicroseconds (35000) ;
+    put4Command (lcd, func >> 4) ; delayMicroseconds (35000) ;
+    put4Command (lcd, func >> 4) ; delayMicroseconds (35000) ;
     func = LCD_FUNC ;					// 4th set: 4-bit mode
-    put4Command (lcd, func >> 4) ; delayMicroseconds (35) ;
+    put4Command (lcd, func >> 4) ; delayMicroseconds (35000) ;
     lcd->bits = 4 ;
   }
   else
   {
     func = LCD_FUNC | LCD_FUNC_DL ;
-    putCommand  (lcd, func     ) ; delayMicroseconds (35) ;
-    putCommand  (lcd, func     ) ; delayMicroseconds (35) ;
-    putCommand  (lcd, func     ) ; delayMicroseconds (35) ;
+    putCommand  (lcd, func     ) ; delayMicroseconds (35000) ;
+    putCommand  (lcd, func     ) ; delayMicroseconds (35000) ;
+    putCommand  (lcd, func     ) ; delayMicroseconds (35000) ;
   }
 
   if (lcd->rows > 1)
   {
     func |= LCD_FUNC_N ;
-    putCommand (lcd, func) ; delayMicroseconds (35) ;
+    putCommand (lcd, func) ; delayMicroseconds (35000) ;
   }
 
 // Rest of the initialisation sequence
